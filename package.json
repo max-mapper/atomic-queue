@@ -1,0 +1,28 @@
+{
+  "name": "atomic-queue",
+  "version": "1.0.0",
+  "description": "like async.queue but with queue state persisted on disk",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "max ogden",
+  "license": "BSD",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maxogden/atomic-queue.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maxogden/atomic-queue/issues"
+  },
+  "homepage": "https://github.com/maxogden/atomic-queue",
+  "dependencies": {
+    "changes-feed": "^1.1.0",
+    "changesdown": "^2.2.2",
+    "index-feed": "^1.0.0",
+    "level-mutex": "^0.7.0",
+    "pump": "^1.0.0",
+    "subleveldown": "^2.0.0",
+    "through2": "^0.6.3"
+  }
+}
