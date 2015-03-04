@@ -21,6 +21,7 @@
     "changesdown": "^2.2.2",
     "index-feed": "^1.0.0",
     "level-mutex": "^0.7.0",
+    "memdb": "^0.2.0",
     "pump": "^1.0.0",
     "subleveldown": "^2.0.0",
     "through2": "^0.6.3"

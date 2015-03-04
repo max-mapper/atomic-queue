@@ -3,8 +3,8 @@ var changes = require('changes-feed')
 var changesdown = require('changesdown')
 
 module.exports = function (opts) {
-  var feed = changes(sublevel(opts.data, 'feed'))
-  var db = changesdown(sublevel(opts.data, 'db', opts), feed, opts)
+  var feed = changes(sublevel(opts.db, 'feed'))
+  var db = changesdown(sublevel(opts.db, 'db', opts), feed, opts)
   return {
     feed: feed,
     db: db
