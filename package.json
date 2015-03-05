@@ -18,7 +18,7 @@
   "homepage": "https://github.com/maxogden/atomic-queue",
   "dependencies": {
     "changes-feed": "^1.1.0",
-    "changesdown": "^2.2.2",
+    "changesdown": "^2.3.0",
     "index-feed": "^1.0.0",
     "level-mutex": "^0.7.0",
     "memdb": "^0.2.0",
