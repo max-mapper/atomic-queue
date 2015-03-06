@@ -34,7 +34,7 @@ function Queue (worker, opts) {
   this.put = queuedb.put.bind(queuedb)
   this.del = queuedb.del.bind(queuedb)
   this.batch = queuedb.batch.bind(queuedb)
-  
+
   this.inflight = {}
 
   this.pool.on('start', function start (data) {
@@ -46,13 +46,13 @@ function Queue (worker, opts) {
     debug('finish', data.change)
     self.inflight[data.change] = {change: data.change, finished: true}
   })
-  
-  this.on('update-start', function(data) {
+
+  this.on('update-start', function (data) {
     debug('update-start', data)
     self.updatingInflight = true
   })
-  
-  this.on('update-end', function(data) {
+
+  this.on('update-end', function (data) {
     debug('update-end', data)
     self.updatingInflight = false
   })
@@ -65,7 +65,7 @@ inherits(Queue, events.EventEmitter)
 
 Queue.prototype.initialize = function initialize () {
   var self = this
-  
+
   self.db.get('inflight', function doneGet (err, inflightData) {
     if (err && err.type !== 'NotFoundError') return self.emit('error', err)
     if (!inflightData) inflightData = {since: 0, inflight: {}}
@@ -78,7 +78,7 @@ Queue.prototype.initialize = function initialize () {
 
 Queue.prototype.startQueueStream = function createQueueStream (opts) {
   var self = this
-  
+
   var changeStream = this.changes.db.createChangesStream(opts)
 
   var splitStream = through.obj(function split (data, enc, cb) {
@@ -89,18 +89,18 @@ Queue.prototype.startQueueStream = function createQueueStream (opts) {
       // also kick off the worker
       proc.work(data, doneWorking)
     })
-    
+
     function doneWorking (err) {
       if (err) return splitStream.destroy(err)
 
       self.emit('finish', data.change)
-  
+
       // TODO implement purging. should remove processed entries from the changes feed
 
       var inflight = self.inflightWorkers()
 
       update()
-    
+
       function update () {
         if (self.updatingInflight) return self.once('update-end', update)
         self.emit('update-start', inflight)
@@ -119,16 +119,15 @@ Queue.prototype.startQueueStream = function createQueueStream (opts) {
 
 Queue.prototype.inflightWorkers = function inflightWorkers () {
   var self = this
-  
+
   var inflight = Object.keys(this.inflight)
-    .map(function(el) {
+    .map(function expand (el) {
       return self.inflight[el]
     })
     .sort(function changeSort (a, b) {
       return a.change > b.change
     })
-  
-  
+
   var startIndex, startChange
   for (var i = 0; i < inflight.length; i++) {
     var el = inflight[i]
@@ -138,15 +137,15 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
       break
     }
   }
-  
+
   if (typeof startIndex === 'undefined') return {since: 0, inflight: {}} // all workers are done
   else inflight = inflight.slice(startIndex)
-  
+
   // turn back into object
   var inflightObj = {}
-  inflight.forEach(function(el) {
+  inflight.forEach(function (el) {
     inflightObj[el.change] = el
   })
-  
+
   return {since: startChange, inflight: inflightObj}
 }

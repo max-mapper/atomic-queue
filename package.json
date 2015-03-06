@@ -9,6 +9,9 @@
     "type": "git",
     "url": "https://github.com/maxogden/atomic-queue.git"
   },
+  "scripts": {
+    "test": "standard && node test.js"
+  },
   "bugs": {
     "url": "https://github.com/maxogden/atomic-queue/issues"
   },
@@ -23,7 +26,9 @@
     "subleveldown": "^2.0.0",
     "through2": "^0.6.3"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "standard": "^2.10.0"
+  },
   "keywords": [
     "leveldb",
     "levelup"
