@@ -2,16 +2,19 @@ var createQueue = require('./')
 
 var queue = createQueue(doWork, {concurrency: 4})
 
-queue.changes.db.put('a', 'a', function done () {})
-queue.changes.db.put('b', 'b', function done () {})
-queue.changes.db.put('c', 'c', function done () {})
-queue.changes.db.put('d', 'd', function done () {})
-queue.changes.db.put('e', 'e', function done () {})
-queue.changes.db.put('f', 'f', function done () {})
-queue.changes.db.put('g', 'g', function done () {})
+queue.put('a', 'a', noop)
+queue.put('b', 'b', noop)
+queue.put('c', 'c', noop)
+queue.put('d', 'd', noop)
+queue.put('e', 'e', noop)
+queue.put('f', 'f', noop)
+queue.put('g', 'g', noop)
 
 function doWork (data, cb) {
   setTimeout(function () {
+    console.log('processing', data)
     cb()
   }, Math.random() * 5000)
 }
+
+function noop () {}

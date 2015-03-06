@@ -28,6 +28,13 @@ function Queue (worker, opts) {
     valueEncoding: 'json'
   })
 
+  // expose methods
+  var queuedb = this.changes.db
+  this.get = queuedb.get.bind(queuedb)
+  this.put = queuedb.put.bind(queuedb)
+  this.del = queuedb.del.bind(queuedb)
+  this.batch = queuedb.batch.bind(queuedb)
+  
   this.inflight = {}
 
   this.pool.on('start', function start (data) {
