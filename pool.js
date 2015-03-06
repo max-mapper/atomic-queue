@@ -23,11 +23,12 @@ Pool.prototype.createWorkers = function createWorkers () {
     var worker = createWorker(this.workFn)
 
     // consolidate events
-    worker.on('start', function onStart () {
-      self.emit('start', worker)
+    worker.on('start', function onStart (data) {
+      self.emit('start', data, worker)
     })
-    worker.on('finish', function onFinish () {
-      self.emit('finish', worker)
+
+    worker.on('finish', function onFinish (data) {
+      self.emit('finish', data, worker)
     })
 
     workers.push(worker)
@@ -49,7 +50,7 @@ Pool.prototype.getFree = function getFree (cb) {
   wait()
 
   function wait () {
-    self.once('finish', function finish (worker) {
+    self.once('finish', function finish (data, worker) {
       // handle case where getFree is waiting on multiple workers
       process.nextTick(function next () {
         if (worker.working) return wait()

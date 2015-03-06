@@ -14,12 +14,12 @@ inherits(Worker, events.EventEmitter)
 
 Worker.prototype.work = function work (data, cb) {
   var self = this
-  this.emit('start')
+  this.emit('start', data)
   this.working = true
   this.workFn(data, function done (err) {
     self.working = false
     if (err) self.emit('error', err)
-    self.emit('finish')
+    self.emit('finish', data)
     cb(err)
   })
 }
