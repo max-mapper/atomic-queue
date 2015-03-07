@@ -53,12 +53,12 @@ function Queue (worker, opts) {
     debug('update-end', data)
     self.updatingInflight = false
   })
-  
+
   this.stream = this.createDuplexStream()
   this.stream._queue = this
-  
+
   events.EventEmitter.call(this)
-  
+
   return this.stream
 }
 
@@ -78,27 +78,27 @@ Queue.prototype.initialize = function initialize (cb) {
 
 Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
   var self = this
-  
+
   this.initialize(function ready (err) {
     if (err) return self.emit('error', err)
     self.emit('ready')
     var readStream = self.createWorkStream({since: self.inflight.since, live: true})
     duplexStream.setReadable(readStream)
   })
-  
+
   var writeStream = through.obj(function write (obj, enc, cb) {
     self.changes.db.put(uuid(), obj, function stored (err) {
       cb(err)
     })
   })
-  
+
   var duplexStream = duplex.obj(writeStream)
   return duplexStream
 }
 
 Queue.prototype.createWorkStream = function createWorkStream (opts) {
   var self = this
-  
+
   var changeStream = this.changes.db.createChangesStream(opts)
 
   var splitStream = through.obj(function split (data, enc, cb) {
