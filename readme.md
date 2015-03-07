@@ -12,7 +12,15 @@ for example usage see `test.js`
 
 ### `var queue = require('atomic-queue')(worker, opts)`
 
-initialize a new queue with a `worker` function and optional options
+initialize a new queue with a `worker` function and optional options. `queue` is a stream
+
+you queue things by writing them to the queue stream:
+
+```js
+queue.write('hello')
+queue.write('goodbye')
+queue.write({name: 'bob'})
+```
 
 `worker` must be a function that has this API:
 
@@ -22,26 +30,7 @@ function work (data, done) {
 }
 ```
 
-`data` in the worker function will be a [`changesdown`](http://npmjs.org/changesdown) change event that looks like this:
-
-```
-{
- change: 1, // the local change number from the queue
- value: {
-   type: 'get', // will be either get, put, del or batch
-   key: 'foo', // the key you put
-   value: 'bar' // the value you put
- }
-}
-```
-
-note that if you use `.batch` to insert stuff into the queue you will receive the data as `type: 'batch'` so your worker code will need to be able to handle that if you choose to use batches (for e.g. atomicity reasons)
-
-### `queue.put`, `queue.get`, `queue.del`, `queue.batch`
-
-these four methods are for modifying data in the queue. most of the time you will most likely be using `put` to add jobs to the queue.
-
-these methods are forwarded from a [`levelup`](http://npmjs.org/levelup) instance. if you need the full instance you can access it at `queue.change.db`
+`data` in the worker function will be the data you wrote into the queue above
 
 ### queue.on
 

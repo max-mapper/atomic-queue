@@ -3,7 +3,9 @@ var events = require('events')
 var inherits = require('inherits')
 var memdb = require('memdb')
 var through = require('through2')
-var pump = require('pump')
+var pump = require('pumpify')
+var duplex = require('duplexify')
+var uuid = require('hat')
 
 var createPool = require('./pool.js')
 var createChangeDB = require('./changedb.js')
@@ -28,57 +30,75 @@ function Queue (worker, opts) {
     valueEncoding: 'json'
   })
 
-  // expose methods
-  var queuedb = this.changes.db
-  this.get = queuedb.get.bind(queuedb)
-  this.put = queuedb.put.bind(queuedb)
-  this.del = queuedb.del.bind(queuedb)
-  this.batch = queuedb.batch.bind(queuedb)
-
   this.inflight = {}
 
-  this.pool.on('start', function start (data) {
-    debug('start', data.change)
-    self.inflight[data.change] = {change: data.change, finished: false}
+  this.pool.on('start', function start (data, worker, change) {
+    var changeNum = change.change
+    debug('start', changeNum)
+    self.inflight[changeNum] = {change: changeNum, finished: false}
   })
 
-  this.pool.on('finish', function finish (data) {
-    debug('finish', data.change)
-    self.inflight[data.change] = {change: data.change, finished: true}
+  this.pool.on('finish', function finish (output, data, worker, change) {
+    var changeNum = change.change
+    debug('finish', changeNum)
+    self.inflight[changeNum] = {change: changeNum, finished: true}
   })
 
-  this.on('update-start', function (data) {
+  this.on('update-start', function updateStart (data) {
     debug('update-start', data)
     self.updatingInflight = true
   })
 
-  this.on('update-end', function (data) {
+  this.on('update-end', function updateEnd (data) {
     debug('update-end', data)
     self.updatingInflight = false
   })
-
-  this.initialize()
+  
+  this.stream = this.createDuplexStream()
+  this.stream._queue = this
+  
   events.EventEmitter.call(this)
+  
+  return this.stream
 }
 
 inherits(Queue, events.EventEmitter)
 
-Queue.prototype.initialize = function initialize () {
+Queue.prototype.initialize = function initialize (cb) {
   var self = this
 
   self.db.get('inflight', function doneGet (err, inflightData) {
-    if (err && err.type !== 'NotFoundError') return self.emit('error', err)
+    if (err && err.type !== 'NotFoundError') return cb(err)
     if (!inflightData) inflightData = {since: 0, inflight: {}}
     debug('inflight-load', inflightData)
     self.inflight = inflightData.inflight
-    var opts = {live: true, since: inflightData.since}
-    self.startQueueStream(opts)
+    cb(null)
   })
 }
 
-Queue.prototype.startQueueStream = function createQueueStream (opts) {
+Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
   var self = this
+  
+  this.initialize(function ready (err) {
+    if (err) return self.emit('error', err)
+    self.emit('ready')
+    var readStream = self.createWorkStream({since: self.inflight.since, live: true})
+    duplexStream.setReadable(readStream)
+  })
+  
+  var writeStream = through.obj(function write (obj, enc, cb) {
+    self.changes.db.put(uuid(), obj, function stored (err) {
+      cb(err)
+    })
+  })
+  
+  var duplexStream = duplex.obj(writeStream)
+  return duplexStream
+}
 
+Queue.prototype.createWorkStream = function createWorkStream (opts) {
+  var self = this
+  
   var changeStream = this.changes.db.createChangesStream(opts)
 
   var splitStream = through.obj(function split (data, enc, cb) {
@@ -87,13 +107,13 @@ Queue.prototype.startQueueStream = function createQueueStream (opts) {
       cb()
 
       // also kick off the worker
-      proc.work(data, doneWorking)
+      proc.work(data.value.value, doneWorking, data)
     })
 
-    function doneWorking (err) {
+    function doneWorking (err, output) {
       if (err) return splitStream.destroy(err)
 
-      self.emit('finish', data.change)
+      self.emit('finish', data)
 
       // TODO implement purging. should remove processed entries from the changes feed
 
@@ -107,14 +127,13 @@ Queue.prototype.startQueueStream = function createQueueStream (opts) {
         self.db.put('inflight', inflight, function updated (err) {
           self.emit('update-end', inflight)
           if (err) splitStream.destroy(err)
+          if (output) splitStream.push(output)
         })
       }
     }
   })
 
-  pump(changeStream, splitStream, function done (err) {
-    if (err) self.emit('error', err)
-  })
+  return pump(changeStream, splitStream)
 }
 
 Queue.prototype.inflightWorkers = function inflightWorkers () {
