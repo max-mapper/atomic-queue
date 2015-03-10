@@ -1,5 +1,6 @@
 var events = require('events')
 var inherits = require('inherits')
+var debug = require('debug')('atomic-queue-worker')
 
 module.exports = Worker
 
@@ -15,9 +16,11 @@ inherits(Worker, events.EventEmitter)
 Worker.prototype.work = function work (data, cb, change) {
   var self = this
   this.emit('start', data, change)
+  debug('start', change.change)
   this.working = true
   this.workFn(data, function done (err, output) {
     self.working = false
+    debug('finish', change.change)
     if (err) self.emit('error', err)
     self.emit('finish', output, data, change)
     cb(err)

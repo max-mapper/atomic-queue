@@ -19,11 +19,10 @@ function Queue (worker, opts) {
   if (!(this instanceof Queue)) return new Queue(worker, opts)
   if (!opts) opts = {}
 
-  this.worker = worker
   this.concurrency = opts.concurrency || 1
   this.db = opts.db || memdb()
   this.opts = opts
-  this.pool = createPool(this.worker, opts)
+  this.pool = createPool(worker, opts)
   this.changes = createChangeDB({
     db: this.db,
     keyEncoding: 'json',
@@ -31,6 +30,9 @@ function Queue (worker, opts) {
   })
 
   this.inflight = {}
+
+  this.stream = this.createDuplexStream()
+  this.stream._queue = this
 
   this.pool.on('start', function start (data, worker, change) {
     var changeNum = change.change
@@ -44,18 +46,15 @@ function Queue (worker, opts) {
     self.inflight[changeNum] = {change: changeNum, finished: true}
   })
 
-  this.on('update-start', function updateStart (data) {
+  this.stream.on('update-start', function updateStart (data) {
     debug('update-start', data)
     self.updatingInflight = true
   })
 
-  this.on('update-end', function updateEnd (data) {
+  this.stream.on('update-end', function updateEnd (data) {
     debug('update-end', data)
     self.updatingInflight = false
   })
-
-  this.stream = this.createDuplexStream()
-  this.stream._queue = this
 
   events.EventEmitter.call(this)
 
@@ -80,8 +79,8 @@ Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
   var self = this
 
   this.initialize(function ready (err) {
-    if (err) return self.emit('error', err)
-    self.emit('ready')
+    if (err) return self.stream.destroy(err)
+    self.stream.emit('ready', self.inflight)
     var readStream = self.createWorkStream({since: self.inflight.since, live: true})
     duplexStream.setReadable(readStream)
   })
@@ -105,15 +104,12 @@ Queue.prototype.createWorkStream = function createWorkStream (opts) {
     self.pool.getFree(function gotWorker (proc) {
       // call cb so we get more data written to us
       cb()
-
       // also kick off the worker
       proc.work(data.value.value, doneWorking, data)
     })
 
     function doneWorking (err, output) {
       if (err) return splitStream.destroy(err)
-
-      self.emit('finish', data)
 
       // TODO implement purging. should remove processed entries from the changes feed
 
@@ -122,10 +118,10 @@ Queue.prototype.createWorkStream = function createWorkStream (opts) {
       update()
 
       function update () {
-        if (self.updatingInflight) return self.once('update-end', update)
-        self.emit('update-start', inflight)
+        if (self.updatingInflight) return self.stream.once('update-end', update)
+        self.stream.emit('update-start', inflight)
         self.db.put('inflight', inflight, function updated (err) {
-          self.emit('update-end', inflight)
+          self.stream.emit('update-end', inflight)
           if (err) splitStream.destroy(err)
           if (output) splitStream.push(output)
         })

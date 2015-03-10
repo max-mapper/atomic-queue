@@ -32,26 +32,30 @@ function work (data, done) {
 
 `data` in the worker function will be the data you wrote into the queue above
 
-### queue.on
+### events
 
-you can listen to the following events:
+in addition to standard stream events you can also listen to the following:
 
-#### error
+#### queue.on('ready')
+
+emitted after startup when the queue state has been read from disk and the queue is now ready to start working
+
+#### queue.on('error')
 
 when a catastrophic error has occurred
 
-#### start
-
-when a job starts working
-
-#### end
-
-when a job finishes working
-
-#### update-start
+#### queue.on('update-start')
 
 when the queue starts flushing its state to disk
 
-#### update-end
+#### queue.on('update-end')
 
 when the queue finishes flushing its state to disk
+
+#### queue.pool.on('start')
+
+when a job starts working
+
+#### queue.pool.on('finish')
+
+when a job finishes working

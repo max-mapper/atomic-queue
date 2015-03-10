@@ -4,10 +4,10 @@ var createWorker = require('./worker.js')
 
 module.exports = Pool
 
-function Pool (workFn, opts) {
-  if (!(this instanceof Pool)) return new Pool(workFn, opts)
+function Pool (workerTemplate, opts) {
+  if (!(this instanceof Pool)) return new Pool(workerTemplate, opts)
   if (!opts) opts = {}
-  this.workFn = workFn
+  this.workerTemplate = workerTemplate
   this.working = 0
   this.limit = opts.concurrency || 1
   this.workers = this.createWorkers()
@@ -19,8 +19,12 @@ inherits(Pool, events.EventEmitter)
 Pool.prototype.createWorkers = function createWorkers () {
   var self = this
   var workers = []
+  var useExistingWorkers = false
+  if (Array.isArray(this.workerTemplate)) useExistingWorkers = true
+
   for (var i = 0; i < this.limit; i++) {
-    var worker = createWorker(this.workFn)
+    var workFn = useExistingWorkers ? this.workerTemplate[i] : this.workerTemplate
+    var worker = createWorker(workFn)
 
     // consolidate events
     worker.on('start', function onStart (data, change) {
