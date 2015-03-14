@@ -29,7 +29,8 @@
     "through2": "^0.6.3"
   },
   "devDependencies": {
-    "standard": "^2.10.0"
+    "standard": "^2.10.0",
+    "tape": "^3.5.0"
   },
   "keywords": [
     "leveldb",
