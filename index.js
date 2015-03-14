@@ -30,6 +30,7 @@ function Queue (worker, opts) {
   })
 
   this.inflight = {}
+  this.pending = 0
 
   this.stream = this.createDuplexStream()
   this.stream._queue = this
@@ -43,6 +44,7 @@ function Queue (worker, opts) {
   this.pool.on('finish', function finish (output, data, worker, change) {
     var changeNum = change.change
     debug('finish', changeNum)
+    self.latestChange = self.changes.db.db.change
     self.inflight[changeNum] = {change: changeNum, finished: true}
   })
 
@@ -85,13 +87,30 @@ Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
     duplexStream.setReadable(readStream)
   })
 
-  var writeStream = through.obj(function write (obj, enc, cb) {
-    self.changes.db.put(uuid(), obj, function stored (err) {
-      cb(err)
-    })
-  })
+  var writeStream = through.obj(
+    function write (obj, enc, cb) {
+      self.changes.db.put(uuid(), obj, function stored (err) {
+        cb(err)
+      })
+    },
+    function end (done) {
+      self.stream.on('update-end', function updateEnd (inflight) {
+        if (self.pending === 0 && self.latestChange === inflight.since) {
+          console.log('done')
+          duplexStream.uncork()
+          done()
+        }
+      })
+    }
+  )
 
   var duplexStream = duplex.obj(writeStream)
+
+  // one weird trick from mafintosh (makes 'finish' wait for writable end)
+  duplexStream.on('prefinish', function prefinish () {
+    duplexStream.cork()
+  })
+
   return duplexStream
 }
 
@@ -100,36 +119,44 @@ Queue.prototype.createWorkStream = function createWorkStream (opts) {
 
   var changeStream = this.changes.db.createChangesStream(opts)
 
-  var splitStream = through.obj(function split (data, enc, cb) {
-    self.pool.getFree(function gotWorker (proc) {
-      // call cb so we get more data written to us
-      cb()
-      // also kick off the worker
-      proc.work(data.value.value, doneWorking, data)
-    })
+  var splitStream = through.obj(
+    function split (data, enc, cb) {
+      self.pending++
 
-    function doneWorking (err, output) {
-      if (err) return splitStream.destroy(err)
+      self.pool.getFree(function gotWorker (proc) {
+        // call cb so we get more data written to us
+        cb()
 
-      // TODO implement purging. should remove processed entries from the changes feed
+        // also kick off the worker
+        proc.work(data.value.value, doneWorking, data)
+      })
 
-      var inflight = self.inflightWorkers()
+      function doneWorking (err, output) {
+        self.pending--
 
-      update()
+        if (err) return pipeline.destroy(err)
 
-      function update () {
-        if (self.updatingInflight) return self.stream.once('update-end', update)
-        self.stream.emit('update-start', inflight)
-        self.db.put('inflight', inflight, function updated (err) {
-          self.stream.emit('update-end', inflight)
-          if (err) splitStream.destroy(err)
-          if (output) splitStream.push(output)
-        })
+        // TODO implement purging. should remove processed entries from the changes feed
+
+        var inflight = self.inflightWorkers()
+
+        update()
+
+        function update () {
+          if (self.updatingInflight) return self.stream.once('update-end', update)
+          self.stream.emit('update-start', inflight)
+          self.db.put('inflight', inflight, function updated (err) {
+            self.stream.emit('update-end', inflight)
+            if (err) pipeline.destroy(err)
+            if (output) splitStream.push(output)
+          })
+        }
       }
     }
-  })
+  )
 
-  return pump(changeStream, splitStream)
+  var pipeline = pump(changeStream, splitStream)
+  return pipeline
 }
 
 Queue.prototype.inflightWorkers = function inflightWorkers () {
@@ -153,7 +180,7 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
     }
   }
 
-  if (typeof startIndex === 'undefined') return {since: 0, inflight: {}} // all workers are done
+  if (typeof startIndex === 'undefined') return {since: self.latestChange, inflight: {}} // all workers are done
   else inflight = inflight.slice(startIndex)
 
   // turn back into object
