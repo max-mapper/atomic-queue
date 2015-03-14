@@ -21,7 +21,6 @@ Worker.prototype.work = function work (data, cb, change) {
   this.workFn(data, function done (err, output) {
     self.working = false
     debug('finish', change.change)
-    if (err) self.emit('error', err)
     self.emit('finish', output, data, change)
     cb(err)
   }, change)

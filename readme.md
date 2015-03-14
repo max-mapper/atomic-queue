@@ -42,7 +42,7 @@ emitted after startup when the queue state has been read from disk and the queue
 
 #### queue.on('error')
 
-when a catastrophic error has occurred
+when a catastrophic error has occurred. you **must** handle this. receiving this also means the queue stream has been destroyed.
 
 #### queue.on('update-start')
 

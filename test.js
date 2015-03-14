@@ -39,22 +39,15 @@ test('handle error', function test (t) {
   queue.write('f')
   queue.end()
 
-  queue.on('finish', function end () {
-    console.log('finish!')
-  })
-
   queue.on('error', function error (err) {
-    console.log('got error')
-    t.error(err)
+    t.equals(err.message, 'oh god the humanity', 'got error')
     t.end()
   })
 
   function doWork (data, cb) {
-    setTimeout(function randomDelay () {
-      console.error('processing', data)
-      pending--
-      if (pending === 3) return cb(new Error('oh god the humanity'))
-      cb()
-    }, Math.random() * 100)
+    console.error('processing', data)
+    pending--
+    if (pending === 3) return cb(new Error('oh god the humanity'))
+    cb()
   }
 })

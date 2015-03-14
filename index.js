@@ -96,7 +96,6 @@ Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
     function end (done) {
       self.stream.on('update-end', function updateEnd (inflight) {
         if (self.pending === 0 && self.latestChange === inflight.since) {
-          console.log('done')
           duplexStream.uncork()
           done()
         }
@@ -134,7 +133,7 @@ Queue.prototype.createWorkStream = function createWorkStream (opts) {
       function doneWorking (err, output) {
         self.pending--
 
-        if (err) return pipeline.destroy(err)
+        if (err) return self.stream.destroy(err)
 
         // TODO implement purging. should remove processed entries from the changes feed
 
@@ -147,7 +146,7 @@ Queue.prototype.createWorkStream = function createWorkStream (opts) {
           self.stream.emit('update-start', inflight)
           self.db.put('inflight', inflight, function updated (err) {
             self.stream.emit('update-end', inflight)
-            if (err) pipeline.destroy(err)
+            if (err) self.stream.destroy(err)
             if (output) splitStream.push(output)
           })
         }
