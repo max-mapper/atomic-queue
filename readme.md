@@ -44,7 +44,7 @@ emitted after startup when the queue state has been read from disk and the queue
 
 when a catastrophic error has occurred. you **must** handle this. receiving this also means the queue stream has been destroyed.
 
-#### queue.on('drain')
+#### queue.on('idle')
 
 when the number of pending jobs reaches 0. may be called multiple times
 
