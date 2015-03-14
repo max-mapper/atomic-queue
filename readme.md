@@ -44,6 +44,14 @@ emitted after startup when the queue state has been read from disk and the queue
 
 when a catastrophic error has occurred. you **must** handle this. receiving this also means the queue stream has been destroyed.
 
+#### queue.on('drain')
+
+when the number of pending jobs reaches 0. may be called multiple times
+
+#### queue.on('finish')
+
+when the writable side of the queue has been ended *and* all jobs have finished processing
+
 #### queue.on('update-start')
 
 when the queue starts flushing its state to disk

@@ -54,6 +54,7 @@ function Queue (worker, opts) {
   })
 
   this.stream.on('update-end', function updateEnd (data) {
+    if (self.pending === 0) self.emit('drain')
     debug('update-end', data)
     self.updatingInflight = false
   })
