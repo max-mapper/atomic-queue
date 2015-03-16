@@ -30,6 +30,7 @@ function Queue (worker, opts) {
   })
 
   this.inflight = {}
+  this.latestChange = 0
   this.pending = 0
 
   this.stream = this.createDuplexStream()
@@ -38,14 +39,14 @@ function Queue (worker, opts) {
   this.pool.on('start', function start (data, worker, change) {
     var changeNum = change.change
     debug('start', changeNum)
-    self.inflight[changeNum] = {change: changeNum, finished: false}
+    self.inflight.jobs[changeNum] = {change: changeNum, finished: false}
   })
 
   this.pool.on('finish', function finish (output, data, worker, change) {
     var changeNum = change.change
     debug('finish', changeNum)
     self.latestChange = self.changes.db.db.change
-    self.inflight[changeNum] = {change: changeNum, finished: true}
+    self.inflight.jobs[changeNum] = {change: changeNum, finished: true}
   })
 
   this.stream.on('update-start', function updateStart (data) {
@@ -71,9 +72,9 @@ Queue.prototype.initialize = function initialize (cb) {
 
   self.db.get('inflight', function doneGet (err, inflightData) {
     if (err && err.type !== 'NotFoundError') return cb(err)
-    if (!inflightData) inflightData = {since: 0, inflight: {}}
+    if (!inflightData) inflightData = {since: 0, jobs: {}}
     debug('inflight-load', inflightData)
-    self.inflight = inflightData.inflight
+    self.inflight = inflightData
     cb(null)
   })
 }
@@ -95,12 +96,18 @@ Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
       })
     },
     function end (done) {
-      self.stream.on('update-end', function updateEnd (inflight) {
+      finish(self.inflight)
+      
+      function finish (inflight) {
+        debug('finish?', [self.pending, self.latestChange, inflight.since])
         if (self.pending === 0 && self.latestChange === inflight.since) {
+          debug('uncorking')
           duplexStream.uncork()
           done()
+        } else {
+          self.stream.once('update-end', finish)
         }
-      })
+      }
     }
   )
 
@@ -146,6 +153,7 @@ Queue.prototype.createWorkStream = function createWorkStream (opts) {
           if (self.updatingInflight) return self.stream.once('update-end', update)
           self.stream.emit('update-start', inflight)
           self.db.put('inflight', inflight, function updated (err) {
+            self.inflight = inflight
             self.stream.emit('update-end', inflight)
             if (err) self.stream.destroy(err)
             if (output) splitStream.push(output)
@@ -162,9 +170,9 @@ Queue.prototype.createWorkStream = function createWorkStream (opts) {
 Queue.prototype.inflightWorkers = function inflightWorkers () {
   var self = this
 
-  var inflight = Object.keys(this.inflight)
+  var inflight = Object.keys(this.inflight.jobs)
     .map(function expand (el) {
-      return self.inflight[el]
+      return self.inflight.jobs[el]
     })
     .sort(function changeSort (a, b) {
       return a.change > b.change
@@ -180,7 +188,7 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
     }
   }
 
-  if (typeof startIndex === 'undefined') return {since: self.latestChange, inflight: {}} // all workers are done
+  if (typeof startIndex === 'undefined') return {since: self.latestChange, jobs: {}} // all workers are done
   else inflight = inflight.slice(startIndex)
 
   // turn back into object
@@ -189,5 +197,5 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
     inflightObj[el.change] = el
   })
 
-  return {since: startChange, inflight: inflightObj}
+  return {since: startChange, jobs: inflightObj}
 }

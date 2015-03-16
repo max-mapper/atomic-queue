@@ -5,6 +5,11 @@ test('process 6 normal items', function test (t) {
   var queue = createQueue(doWork, {concurrency: 1})
   var pending = 6
 
+  queue.on('finish', function end () {
+    t.equal(pending, 0, 'pending is 0')
+    t.end()
+  })
+  
   queue.write('a')
   queue.write('b')
   queue.write('c')
@@ -13,17 +18,10 @@ test('process 6 normal items', function test (t) {
   queue.write('f')
   queue.end()
 
-  queue.on('finish', function end () {
-    t.equal(pending, 0, 'pending is 0')
-    t.end()
-  })
-
   function doWork (data, cb) {
-    setTimeout(function randomDelay () {
-      console.error('processing', data)
-      pending--
-      cb()
-    }, Math.random() * 100)
+    console.error('processing', data)
+    pending--
+    cb()
   }
 })
 
