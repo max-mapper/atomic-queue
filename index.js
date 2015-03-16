@@ -115,7 +115,7 @@ Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
 
   // one weird trick from mafintosh (makes 'finish' wait for writable end)
   duplexStream.on('prefinish', function prefinish () {
-    duplexStream.cork()
+    if (self.pending) duplexStream.cork()
   })
 
   return duplexStream
