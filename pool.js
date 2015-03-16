@@ -24,6 +24,10 @@ Pool.prototype.createWorkers = function createWorkers () {
 
   for (var i = 0; i < this.limit; i++) {
     var workFn = useExistingWorkers ? this.workerTemplate[i] : this.workerTemplate
+
+    // if insufficient number of workers was passed in then return early
+    if (!workFn) return workers
+
     var worker = createWorker(workFn)
 
     // consolidate events

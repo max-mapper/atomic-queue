@@ -22,6 +22,7 @@ function Queue (worker, opts) {
   this.concurrency = opts.concurrency || 1
   this.db = opts.db || memdb()
   this.opts = opts
+  
   this.pool = createPool(worker, opts)
   this.changes = createChangeDB({
     db: this.db,
@@ -178,7 +179,10 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
       return a.change > b.change
     })
 
+  var lastJob = inflight[inflight.length - 1]
+  var lastChange = lastJob ? lastJob.change : this.latestChange
   var startIndex, startChange
+
   for (var i = 0; i < inflight.length; i++) {
     var el = inflight[i]
     if (el.finished === false) {
@@ -187,8 +191,8 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
       break
     }
   }
-
-  if (typeof startIndex === 'undefined') return {since: self.latestChange, jobs: {}} // all workers are done
+  
+  if (typeof startIndex === 'undefined') return {since: lastChange, jobs: {}} // all workers are done
   else inflight = inflight.slice(startIndex)
 
   // turn back into object
