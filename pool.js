@@ -1,6 +1,7 @@
 var events = require('events')
 var inherits = require('inherits')
 var createWorker = require('./worker.js')
+var debug = require('debug')('atomic-queue-pool')
 
 module.exports = Pool
 
@@ -41,6 +42,9 @@ Pool.prototype.createWorkers = function createWorkers () {
 
     workers.push(worker)
   }
+
+  debug('created workers', {count: workers.length})
+
   return workers
 }
 
@@ -50,7 +54,9 @@ Pool.prototype.getFree = function getFree (cb) {
   // try to get a free worker
   for (var i = 0; i < this.workers.length; i++) {
     var worker = this.workers[i]
-    if (worker.working) continue
+    if (!worker.available) continue
+    debug('found free worker')
+    worker.available = false
     return cb(worker)
   }
 
@@ -58,10 +64,13 @@ Pool.prototype.getFree = function getFree (cb) {
   wait()
 
   function wait () {
+    debug('waiting on free worker')
     self.once('finish', function finish (output, data, worker, change) {
       // handle case where getFree is waiting on multiple workers
       process.nextTick(function next () {
-        if (worker.working) return wait()
+        if (!worker.available) return wait()
+        debug('waited for free worker, just got one')
+        worker.available = false
         cb(worker)
       })
     })
