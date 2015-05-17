@@ -22,7 +22,7 @@ function Queue (worker, opts) {
   this.concurrency = opts.concurrency || 1
   this.db = opts.db || memdb()
   this.opts = opts
-  
+
   this.pool = createPool(worker, opts)
   this.changes = createChangeDB({
     db: this.db,
@@ -36,6 +36,10 @@ function Queue (worker, opts) {
 
   this.stream = this.createDuplexStream()
   this.stream._queue = this
+  //
+  // Make the reference to the pool available so we can access it via the stream
+  //
+  this.stream.pool = this.pool
 
   this.pool.on('start', function start (data, worker, change) {
     var changeNum = change.change
@@ -98,7 +102,7 @@ Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
     },
     function end (done) {
       finish(self.inflight)
-      
+
       function finish (inflight) {
         debug('finish?', [self.pending, self.latestChange, inflight.since])
         if (self.pending === 0 && self.latestChange === inflight.since) {
@@ -191,7 +195,7 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
       break
     }
   }
-  
+
   if (typeof startIndex === 'undefined') return {since: lastChange, jobs: {}} // all workers are done
   else inflight = inflight.slice(startIndex)
 
