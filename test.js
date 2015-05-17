@@ -9,7 +9,7 @@ test('process 6 normal items', function test (t) {
     t.equal(pending, 0, 'pending is 0')
     t.end()
   })
-  
+
   queue.write('a')
   queue.write('b')
   queue.write('c')
