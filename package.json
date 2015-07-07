@@ -1,6 +1,6 @@
 {
   "name": "atomic-queue",
-  "version": "5.0.3",
+  "version": "5.0.4",
   "description": "a crash friendly queue that persists queue state and can restart. uses a worker pool and has configurable concurrency",
   "main": "index.js",
   "author": "max ogden",
