@@ -49,3 +49,27 @@ test('handle error', function test (t) {
     cb()
   }
 })
+
+test('handle concurrency', function test (t) {
+  var queue = createQueue(doWork, {concurrency: 2})
+  var pending = 6
+
+  queue.write('a')
+  queue.write('b')
+  queue.write('c')
+  queue.write('d')
+  queue.write('e')
+  queue.write('f')
+  queue.end()
+
+  queue.on('finish', function end () {
+    t.equal(pending, 0, 'pending is 0')
+    t.end()
+  })
+
+  function doWork (data, cb) {
+    console.error('processing', data)
+    pending--
+    setTimeout(cb, pending * 100)
+  }
+})

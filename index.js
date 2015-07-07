@@ -32,6 +32,7 @@ function Queue (worker, opts) {
 
   this.inflight = {}
   this.latestChange = 0
+  this.highestChange = 0
   this.pending = 0
 
   this.stream = this.createDuplexStream()
@@ -50,7 +51,13 @@ function Queue (worker, opts) {
   this.pool.on('finish', function finish (output, data, worker, change) {
     var changeNum = change.change
     debug('finish', changeNum)
+    //
+    // When we are dealing with concurrent changes we can hit cases where the
+    // change here is a seq less than the previous. Lets also keep track of the
+    // highest change in order to serve both cases.
+    //
     self.latestChange = self.changes.db.db.change
+    self.highestChange = changeNum < self.highestChange ? self.highestChange : changeNum
     self.inflight.jobs[changeNum] = {change: changeNum, finished: true}
   })
 
@@ -104,8 +111,8 @@ Queue.prototype.createDuplexStream = function createDuplexStream (opts) {
       finish(self.inflight)
 
       function finish (inflight) {
-        debug('finish?', [self.pending, self.latestChange, inflight.since])
-        if (self.pending === 0 && self.latestChange === inflight.since) {
+        debug('finish?', [self.pending, self.latestChange, self.highestChange, inflight.since])
+        if (self.pending === 0 && self.highestChange === inflight.since) {
           debug('uncorking')
           duplexStream.uncork()
           done()
@@ -184,7 +191,7 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
     })
 
   var lastJob = inflight[inflight.length - 1]
-  var lastChange = lastJob ? lastJob.change : this.latestChange
+  var lastChange = lastJob && lastJob.change >= this.highestChange ? lastJob.change : this.highestChange
   var startIndex, startChange
 
   for (var i = 0; i < inflight.length; i++) {
