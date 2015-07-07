@@ -32,6 +32,7 @@ function Queue (worker, opts) {
 
   this.inflight = {}
   this.latestChange = 0
+  this.highestChange = 0
   this.pending = 0
 
   this.stream = this.createDuplexStream()
@@ -190,7 +191,7 @@ Queue.prototype.inflightWorkers = function inflightWorkers () {
     })
 
   var lastJob = inflight[inflight.length - 1]
-  var lastChange = lastJob ? lastJob.change : this.latestChange
+  var lastChange = lastJob && lastJob.change >= this.highestChange ? lastJob.change : this.highestChange
   var startIndex, startChange
 
   for (var i = 0; i < inflight.length; i++) {
